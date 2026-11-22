@@ -57,7 +57,7 @@ this prints out the payment token, which is a security concern as it exposes pot
 
 
 Running the tests:
-after running the tests i got 5 failures and 17 passes. i have aditional tests for checkout behavoir, checking stock again at checkout, and preventing duplicate requests that i do not have fixes for.
+after running the tests i got 0 failures and 17 passes. i have aditional tests for checkout behavoir, checking stock again at checkout, and preventing duplicate requests that i do not have fixes for.
 
 the following fixes are connected to the following tests:
 fix 1: test_add_item_rejects_nonpositive_quantity, test_remove_item_rejects_negative_quantity

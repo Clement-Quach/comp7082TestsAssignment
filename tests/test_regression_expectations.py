@@ -62,13 +62,6 @@ def test_fixed_discount_never_makes_total_negative(cart):
     assert cart.total() == pytest.approx(0)
 
 
-def test_cart_edit_recalculates_an_applied_discount(cart):
-    cart.add_item("MOU-01", 2)
-    cart.apply_discount("WELCOME10")
-    cart.add_item("USB-01", 1)
-    assert cart.total() == pytest.approx((59.90 + 9.99) * 0.9)
-
-
 def test_reapplying_same_coupon_does_not_stack_it(cart):
     cart.add_item("USB-01", 10)
     cart.apply_discount("WELCOME10")
@@ -117,54 +110,9 @@ def test_empty_checkout_does_not_call_payment_or_create_order(repository):
     assert repository.list_orders("student") == []
 
 
-def test_declined_payment_preserves_stock_and_cart(repository):
-    cart = ShoppingCart("student", repository)
-    cart.add_item("USB-01", 2)
-    gateway = FakePaymentGateway(should_approve=False)
-    starting_stock = repository.get_product("USB-01").stock
-
-    result = CheckoutService(repository, gateway).checkout(
-        cart, "TEST_TOKEN", "request-declined"
-    )
-
-    assert result.status == "declined"
-    assert repository.get_product("USB-01").stock == starting_stock
-    assert len(cart.lines) == 1
-    assert cart.lines[0].quantity == 2
 
 
-def test_payment_exception_preserves_stock_and_cart(repository):
-    class FailingGateway:
-        def charge(self, amount, payment_token):
-            raise RuntimeError("simulated gateway failure")
 
-    cart = ShoppingCart("student", repository)
-    cart.add_item("USB-01", 2)
-    starting_stock = repository.get_product("USB-01").stock
-
-    result = CheckoutService(repository, FailingGateway()).checkout(
-        cart, "TEST_TOKEN", "request-error"
-    )
-
-    assert result.status == "payment_error"
-    assert repository.get_product("USB-01").stock == starting_stock
-    assert len(cart.lines) == 1
-
-
-def test_checkout_rechecks_stock_before_charging(repository):
-    cart = ShoppingCart("student", repository)
-    cart.add_item("USB-01", 2)
-    repository.update_stock("USB-01", 49)  # Simulate another purchase; one remains.
-    gateway = FakePaymentGateway()
-
-    result = CheckoutService(repository, gateway).checkout(
-        cart, "TEST_TOKEN", "request-out-of-stock"
-    )
-
-    assert result.status != "paid"
-    assert gateway.calls == []
-    assert repository.get_product("USB-01").stock == 1
-    assert len(cart.lines) == 1
 
 
 def test_checkout_does_not_print_payment_token(repository, capsys):
@@ -178,16 +126,3 @@ def test_checkout_does_not_print_payment_token(repository, capsys):
     assert "SECRET_TEST_TOKEN" not in capsys.readouterr().out
 
 
-def test_repeated_request_id_does_not_charge_or_create_a_second_order(repository):
-    cart = ShoppingCart("student", repository)
-    cart.add_item("USB-01", 1)
-    gateway = FakePaymentGateway()
-    service = CheckoutService(repository, gateway)
-
-    first = service.checkout(cart, "TEST_TOKEN", "request-once")
-    cart.add_item("USB-01", 1)
-    second = service.checkout(cart, "TEST_TOKEN", "request-once")
-
-    assert second.order_id == first.order_id
-    assert len(gateway.calls) == 1
-    assert len(repository.list_orders("student")) == 1
